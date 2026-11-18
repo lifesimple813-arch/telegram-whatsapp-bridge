@@ -1,5 +1,5 @@
 import whatsappWeb from "whatsapp-web.js";
-import qrcode from "qrcode-terminal";
+import http from "http";
 
 const { Client, LocalAuth } = whatsappWeb;
 import { config } from "../config.js";
@@ -9,58 +9,55 @@ import log from "../logger.js";
 let ready = false;
 let reauthAlerted = false;
 
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("Bot is running!");
+}).listen(process.env.PORT || 3000);
+
 const puppeteerConfig = {
   headless: true,
-  args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   ...(config.puppeteerExecutablePath && {
     executablePath: config.puppeteerExecutablePath,
   }),
 };
 
-const authPath = config.dataDir ? `${config.dataDir}/wwebjs_auth` : undefined;
+const authPath = config.dataDir ? `${config.dataDir}/wwebjs_auth` : "./wwebjs_auth";
 
 export const client = new Client({
   authStrategy: new LocalAuth({ dataPath: authPath }),
   puppeteer: puppeteerConfig,
+  ...(process.env.WA_PHONE_NUMBER && {
+    pairWithPhoneNumber: {
+      phoneNumber: process.env.WA_PHONE_NUMBER,
+      showNotification: true,
+    },
+  }),
 });
 
-client.on("qr", (qr) => {
-  log.info("Scan this QR code with WhatsApp:");
-  qrcode.generate(qr, { small: true });
-  if (!reauthAlerted) {
-    reauthAlerted = true;
-    sendAlert(
-      "WhatsApp bridge needs re-authentication. Open the server logs and scan the QR code to restore the WhatsApp session.",
-    );
-  }
+client.on("code", (code) => {
+  log.info("========================================");
+  log.info(`YOUR WHATSAPP PAIRING CODE: ${code}`);
+  log.info("========================================");
 });
 
 client.on("ready", () => {
-  log.info("WhatsApp client is ready");
   ready = true;
-  reauthAlerted = false;
+  log.info("WhatsApp client is ready!");
 });
 
-client.on("authenticated", () => log.info("WhatsApp authenticated"));
-client.on("auth_failure", (msg) => {
-  log.error(`WhatsApp authentication failed: ${msg}`);
-});
-client.on("disconnected", (reason) => {
-  log.warn(`WhatsApp disconnected: ${reason}`);
-  ready = false;
-  sendAlert(
-    `WhatsApp bridge disconnected (${reason}). It will try to reconnect; a QR re-scan may be required.`,
-  );
+client.on("authenticated", () => {
+  log.info("WhatsApp authenticated!");
 });
 
-/** @returns {boolean} Whether the WhatsApp client is connected and ready. */
-export const isReady = () => ready;
+client.on("auth_failure", async (msg) => {
+  log.error(`Auth failure: ${msg}`);
+  if (!reauthAlerted) {
+    reauthAlerted = true;
+    await sendAlert("WhatsApp authentication failed!");
+  }
+});
 
-export async function initialize() {
-  log.info("Initializing WhatsApp client...");
-  await client.initialize();
-}
-
-export function destroy() {
-  client.destroy();
+export function isClientReady() {
+  return ready;
 }
