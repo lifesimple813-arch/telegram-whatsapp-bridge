@@ -57,7 +57,6 @@ client.on("auth_failure", async (msg) => {
     await sendAlert("WhatsApp authentication failed!");
   }
 });
-
-export function isClientReady() {
+export function isReady() {
   return ready;
 }
