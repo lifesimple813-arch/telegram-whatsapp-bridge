@@ -16,8 +16,15 @@ http.createServer((req, res) => {
 
 const puppeteerConfig = {
   headless: true,
-  timeout: 120000,
-  args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+  timeout: 180000,
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--no-zygote",
+    "--single-process",
+  ],
   ...(config.puppeteerExecutablePath && {
     executablePath: config.puppeteerExecutablePath,
   }),
@@ -32,6 +39,7 @@ if (cleanPhone.startsWith("2180")) {
 
 export const client = new Client({
   authStrategy: new LocalAuth({ dataPath: authPath }),
+  authTimeoutMs: 180000,
   puppeteer: puppeteerConfig,
   ...(cleanPhone && {
     pairWithPhoneNumber: {
