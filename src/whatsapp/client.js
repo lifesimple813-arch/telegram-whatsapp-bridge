@@ -1,4 +1,4 @@
- import whatsappWeb from "whatsapp-web.js";
+import whatsappWeb from "whatsapp-web.js";
 import http from "http";
 
 const { Client, LocalAuth } = whatsappWeb;
@@ -8,7 +8,6 @@ import log from "../logger.js";
 
 let ready = false;
 let reauthAlerted = false;
-let pairingRequested = false;
 
 http.createServer((req, res) => {
   res.writeHead(200);
@@ -26,33 +25,27 @@ const puppeteerConfig = {
 
 const authPath = config.dataDir ? `${config.dataDir}/wwebjs_auth` : "./wwebjs_auth";
 
+let cleanPhone = (process.env.WA_PHONE_NUMBER || "").replace(/[^0-9]/g, "");
+if (cleanPhone.startsWith("2180")) {
+  cleanPhone = "218" + cleanPhone.slice(4);
+}
+
 export const client = new Client({
   authStrategy: new LocalAuth({ dataPath: authPath }),
   puppeteer: puppeteerConfig,
-  webVersionCache: { type: "none" },
+  ...(cleanPhone && {
+    pairWithPhoneNumber: {
+      phoneNumber: cleanPhone,
+      showNotification: true,
+    },
+  }),
 });
 
-client.on("qr", async () => {
-  let phone = process.env.WA_PHONE_NUMBER || "";
-  phone = phone.replace(/[^0-9]/g, "");
-  if (phone.startsWith("2180")) {
-    phone = "218" + phone.slice(4);
-  }
-  if (phone && !pairingRequested) {
-    pairingRequested = true;
-    log.info(`Requesting pairing code for ${phone} in 8 seconds...`);
-    setTimeout(async () => {
-      try {
-        const code = await client.requestPairingCode(phone, true);
-        log.info("========================================");
-        log.info(`YOUR WHATSAPP PAIRING CODE: ${code}`);
-        log.info("========================================");
-      } catch (err) {
-        log.error(`Pairing code error: ${err.message || err}`);
-        pairingRequested = false;
-      }
-    }, 8000);
-  }
+client.on("code", async (code) => {
+  log.info("========================================");
+  log.info(`YOUR WHATSAPP PAIRING CODE: ${code}`);
+  log.info("========================================");
+  await sendAlert(`🔑 كود ربط واتساب الخاص بكِ الآن هو:\n\n${code}`);
 });
 
 client.on("ready", () => {
