@@ -8,6 +8,7 @@ import log from "../logger.js";
 
 let ready = false;
 let reauthAlerted = false;
+let pairingRequested = false;
 
 http.createServer((req, res) => {
   res.writeHead(200);
@@ -28,18 +29,26 @@ const authPath = config.dataDir ? `${config.dataDir}/wwebjs_auth` : "./wwebjs_au
 export const client = new Client({
   authStrategy: new LocalAuth({ dataPath: authPath }),
   puppeteer: puppeteerConfig,
-  ...(process.env.WA_PHONE_NUMBER && {
-    pairWithPhoneNumber: {
-      phoneNumber: process.env.WA_PHONE_NUMBER,
-      showNotification: true,
-    },
-  }),
 });
 
-client.on("code", (code) => {
-  log.info("========================================");
-  log.info(`YOUR WHATSAPP PAIRING CODE: ${code}`);
-  log.info("========================================");
+client.on("qr", async () => {
+  const phone = process.env.WA_PHONE_NUMBER;
+  if (phone && !pairingRequested) {
+    pairingRequested = true;
+    log.info("Waiting 15 seconds for WhatsApp Web to fully load...");
+    setTimeout(async () => {
+      try {
+        const cleanPhone = phone.replace(/[^0-9]/g, "");
+        const code = await client.requestPairingCode(cleanPhone);
+        log.info("========================================");
+        log.info(`YOUR WHATSAPP PAIRING CODE: ${code}`);
+        log.info("========================================");
+      } catch (err) {
+        log.error(`Pairing code error: ${err.message}`);
+        pairingRequested = false;
+      }
+    }, 15000);
+  }
 });
 
 client.on("ready", () => {
