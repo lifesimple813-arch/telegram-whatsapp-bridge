@@ -57,6 +57,15 @@ client.on("auth_failure", async (msg) => {
     await sendAlert("WhatsApp authentication failed!");
   }
 });
+
+export async function initialize() {
+  await client.initialize();
+}
+
+export async function destroy() {
+  await client.destroy();
+}
+
 export function isReady() {
   return ready;
 }
