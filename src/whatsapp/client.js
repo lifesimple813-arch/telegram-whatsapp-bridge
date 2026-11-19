@@ -16,6 +16,7 @@ http.createServer((req, res) => {
 
 const puppeteerConfig = {
   headless: true,
+  timeout: 120000,
   args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   ...(config.puppeteerExecutablePath && {
     executablePath: config.puppeteerExecutablePath,
